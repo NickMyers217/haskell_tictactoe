@@ -6,18 +6,16 @@ import Data.List (transpose)
 -- A player can either be player One or player Two
 data Player = One | Two deriving Show
 -- A cell can either be an X, O, or Empty
-data Cell   = X | O | Empty deriving (Eq, Show)
+data Cell   = X | O deriving (Eq, Show)
 -- A Pos is an (x,y) pair
 type Pos    = (Int, Int)
 -- A board is a grid of Cells
-type Board  = [[Cell]]
+type Board  = [[Maybe Cell]]
 
 
--- A new empty 3x3 board
-newBoard :: Board
-newBoard = [ [ Empty | x <- [0..2] ]
-                     | y <- [0..2] ]
-
+{-
+ Pos Functions
+-}
 -- Parse a pos entered by a player as a string of two digits
 parsePos :: String -> Pos
 parsePos (x:xs) = (digitToInt x, digitToInt . head $ xs)
@@ -28,14 +26,18 @@ parsePos   _    = error "Invalid position entered."
 validPos :: Board -> Pos -> Bool
 validPos b (x,y)
   | x < 0 || x > 2 || y < 0 || y > 2 = False
-  | b !! y !! x == Empty             = True
+  | b !! y !! x == Nothing           = True
   | otherwise                        = False
 
 
+{-
+ Player Functions
+-}
 -- Converts a player to a String
 showPlayer :: Player -> String
-showPlayer One = "Player one"
-showPlayer Two = "Player two"
+showPlayer p = case p of
+  One -> "Player one"
+  Two -> "Player two"
 
 
 -- Gets the next Player
@@ -45,12 +47,30 @@ nextPlayer p = case p of
   Two -> One
 
 
+-- Gets a players cell letter
+getPlayerCell :: Player -> Cell
+getPlayerCell p = case p of
+  One -> X
+  Two -> O
+
+
+{-
+ Cell Functions
+-}
 -- Converts a cell to a String
-showCell :: Cell -> String
+showCell :: Maybe Cell -> String
 showCell c = case c of
-  X     -> "X"
-  O     -> "O"
-  Empty -> "#"
+  Just X  -> "X"
+  Just O  -> "O"
+  Nothing -> "#"
+
+
+{-
+ Board Functions
+-}
+-- A new empty 3x3 board
+newBoard :: Board
+newBoard = [ [ Nothing | x <- [0..2] ] | y <- [0..2] ]
 
 
 -- Converts a board to a String
@@ -65,8 +85,7 @@ showBoard = unlines . map (concatMap showCell)
 
 -- Modify a board
 modifyBoard :: Board -> Pos -> Player -> Board
-modifyBoard b (x,y) One = b !!= (y, b !! y !!= (x, X))
-modifyBoard b (x,y) Two = b !!= (y, b !! y !!= (x, O))
+modifyBoard b (x,y) p = b !!= (y, b !! y !!= (x, Just . getPlayerCell $ p))
 
 
 -- Gets all the threes on the board
@@ -78,9 +97,13 @@ boardThrees b = b ++ transpose b ++ map (map (\(x,y) -> b !! y !! x)) diags
 
 -- Checks to see if a board is won
 boardWon :: Board -> Bool
-boardWon b = or . map (\xs -> (xs == [X,X,X]) || (xs == [O,O,O])) $ boardThrees b
+boardWon b = or . map matches $ boardThrees b
+  where matches xs = xs == (replicate 3 (Just X)) || xs == (replicate 3 (Just O))
 
 
+{-
+ Impure Functions
+-}
 -- Gets a players move
 getMove :: Board -> Player -> IO String
 getMove b p = do
